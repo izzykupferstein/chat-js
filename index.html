@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<title>Chat Room</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="minimum-scale=1.0, width=device-width, maximum-scale=1.0, user-scalable=no"/>
+	<link rel="stylesheet" href="/styles/reset.html5.min.css">
+	<link rel="stylesheet" href="/styles/main.css" media="all">
+	<script src="/scripts/jquery-1.9.1.min.js"></script>
+</head>
+<body>
+	<div id="wrapper">
+		<div id="messageHistory"></div>
+		<form action="" id="messageCreate">
+			<input type="text" name="msg" id="msg"><button>Send</button>
+		</form>
+	</div>
+	<script src="/scripts/socket.io-client.min.js"></script>
+	<script>
+		Object.defineProperty(window,"Cookies",{get:function(){return document.cookie.split(";").reduce(function(e,t){return e[t.split("=")[0]]=unescape(t.split("=")[1]),e},{})}});
+		var user_cookie = Cookies.auth_token, userid;
+		console.log ( user_cookie );
+		if ( ! user_cookie ) {
+			var user_inquiry = prompt ( 'What is your name?' );
+			console.log ( user_inquiry );
+		}
+		else {
+			userid  = user_cookie;
+		}
+		if ( userid || user_inquiry.length ) {
+			var socket = io ( 'http://192.168.8.120:3000' );
+			if ( ! user_cookie ) {
+				socket.emit ( 'request-data' );
+				socket.emit ( 'new-user', user_inquiry );
+				socket.emit ( 'user-request', { name: user_inquiry });
+				renderMessage ( '<div class="notification">Welcome, <b>' + user_inquiry + '</b>.</div>' );
+				socket.on ( 'user-response', function ( res_data ) {
+					userid = res_data;
+					document.cookie = 'auth_token=' + userid;
+				});
+			}
+			socket.on ( 'response-data', function ( html ) { $( '#messageHistory' ).append ( html ); });
+			socket.on ( 'message', function ( msg ) { renderMessage ( msg ); });
+			socket.on ( 'notif', function ( msg ) { renderMessage ( '<div class="notification">' + msg + '</div>' ); });
+			$( '#messageCreate' ).submit ( function ( e ) {
+				if ( ! $( this ).children ( 'input' ).val ().length ) return false;
+				now = new Date ();
+				renderMessage ( '<div class="message">\n<span class="date">' + now.toUTCString () + '</span>\n<div class="avatar" style="background:none;"><img src="/images/default.png" alt=""></div>\n<h3 style="color:#535667;">You</h3>\n<p>' + $ ( this ).children ( 'input' ).val () + '</p>\n</div>' );
+				socket.emit ( 'chat', { userid: userid || Cookies.auth_token, message: $( this ).children ( 'input' ).val () });
+				$ ( this ).children ( 'input' ).val ( '' );
+				e.preventDefault ();
+			});
+		}
+		else {
+			$( 'body' ).prepend ( '<div style="position:absolute;top:0;left:0;height:100%;width:100%;background:rgba(0,0,0,0.8);"></div>' );
+		}
+		function renderMessage ( msg ) {
+			$( '#messageHistory' ).append ( msg );
+			$( "#messageHistory" ).animate ({ scrollTop: $( document ).height() }, "slow" );
+		}
+	</script>
+</body>
+</html>
